@@ -9,7 +9,10 @@ let
 
   toEnvironmentText = name: value: {
     name = "${value.serviceConfig.Label}.plist";
-    value.text = generators.toPlist { escape = true; } value.serviceConfig;
+    value = {
+      text = generators.toPlist { escape = true; } value.serviceConfig;
+      inherit (value) restartIfChanged;
+    };
   };
 
   launchdConfig = import ./launchd.nix;
@@ -75,6 +78,22 @@ let
           description = ''
             Each attribute in this set specifies an option for a key in the plist.
             <https://developer.apple.com/legacy/library/documentation/Darwin/Reference/ManPages/man5/launchd.plist.5.html>
+          '';
+        };
+
+        restartIfChanged = mkOption {
+          type = types.bool;
+          default = true;
+          description = ''
+            Whether to reload this service during activation when its
+            generated plist changes. When `false`, activation installs the
+            new plist but does not `launchctl unload`/`load` the service, so
+            a running service keeps its previous definition until it is next
+            restarted (a reboot, or an explicit `launchctl kickstart` /
+            `launchctl kill`). The launchd analogue of NixOS's
+            {option}`systemd.services.<name>.restartIfChanged`, for a service
+            that manages its own restarts or must not be torn down mid-work
+            by a reload it triggered itself.
           '';
         };
       };
