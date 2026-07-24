@@ -10,7 +10,11 @@ let
   toEnvironmentText = name: value: {
     name = "${value.serviceConfig.Label}.plist";
     value = {
-      text = generators.toPlist { escape = true; } value.serviceConfig;
+      text = generators.toPlist { escape = true; } (value.serviceConfig
+        // optionalAttrs (value.restartTriggers != [ ]) {
+          "X-Restart-Triggers" = "${pkgs.writeText "X-Restart-Triggers-${name}"
+            (pipe value.restartTriggers [ flatten (map (x: if builtins.isPath x then "${x}" else x)) toString ])}";
+        });
       inherit (value) restartIfChanged;
     };
   };
@@ -94,6 +98,22 @@ let
             {option}`systemd.services.<name>.restartIfChanged`, for a service
             that manages its own restarts or must not be torn down mid-work
             by a reload it triggered itself.
+          '';
+        };
+
+        restartTriggers = mkOption {
+          type = types.listOf (types.either types.path types.str);
+          default = [ ];
+          example = literalExpression ''[ config.environment.etc."foo.conf".source ]'';
+          description = ''
+            A list of paths or strings whose change restarts the service on the
+            next activation, even when the plist is otherwise unchanged, for a
+            service that reads a file the plist does not itself reference. The
+            launchd analogue of NixOS's
+            {option}`systemd.services.<name>.restartTriggers`: the values are
+            written to a store path folded into the plist as `X-Restart-Triggers`,
+            so a change moves that path, the activation's plist diff sees it, and
+            the service is unloaded and loaded again.
           '';
         };
       };
